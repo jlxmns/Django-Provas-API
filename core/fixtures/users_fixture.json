@@ -1,0 +1,172 @@
+[
+  {
+    "model": "core.User",
+    "pk": 1,
+    "fields": {
+      "password": "pbkdf2_sha256$260000$HASH$SALT",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "admin1",
+      "first_name": "James",
+      "last_name": "Wilson",
+      "email": "james.wilson@example.com",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2023-01-01T00:00:00Z",
+      "role": "ADMIN"
+    }
+  },
+  {
+    "model": "core.User",
+    "pk": 2,
+    "fields": {
+      "password": "pbkdf2_sha256$260000$HASH$SALT",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "participant1",
+      "first_name": "Maria",
+      "last_name": "Garcia",
+      "email": "maria.garcia@example.com",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2023-01-02T00:00:00Z",
+      "role": "PARTICIPANTE"
+    }
+  },
+  {
+    "model": "core.User",
+    "pk": 3,
+    "fields": {
+      "password": "pbkdf2_sha256$260000$HASH$SALT",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "participant2",
+      "first_name": "David",
+      "last_name": "Lee",
+      "email": "david.lee@example.com",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2023-01-03T00:00:00Z",
+      "role": "PARTICIPANTE"
+    }
+  },
+  {
+    "model": "core.User",
+    "pk": 4,
+    "fields": {
+      "password": "pbkdf2_sha256$260000$HASH$SALT",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "admin2",
+      "first_name": "Sarah",
+      "last_name": "Johnson",
+      "email": "sarah.johnson@example.com",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2023-01-04T00:00:00Z",
+      "role": "ADMIN"
+    }
+  },
+  {
+    "model": "core.User",
+    "pk": 5,
+    "fields": {
+      "password": "pbkdf2_sha256$260000$HASH$SALT",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "participant3",
+      "first_name": "Robert",
+      "last_name": "Martinez",
+      "email": "robert.martinez@example.com",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2023-01-05T00:00:00Z",
+      "role": "PARTICIPANTE"
+    }
+  },
+  {
+    "model": "core.User",
+    "pk": 6,
+    "fields": {
+      "password": "pbkdf2_sha256$260000$HASH$SALT",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "participant4",
+      "first_name": "Emily",
+      "last_name": "Davis",
+      "email": "emily.davis@example.com",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2023-01-06T00:00:00Z",
+      "role": "PARTICIPANTE"
+    }
+  },
+  {
+    "model": "core.User",
+    "pk": 7,
+    "fields": {
+      "password": "pbkdf2_sha256$260000$HASH$SALT",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "admin3",
+      "first_name": "Michael",
+      "last_name": "Brown",
+      "email": "michael.brown@example.com",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2023-01-07T00:00:00Z",
+      "role": "ADMIN"
+    }
+  },
+  {
+    "model": "core.User",
+    "pk": 8,
+    "fields": {
+      "password": "pbkdf2_sha256$260000$HASH$SALT",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "participant5",
+      "first_name": "Jennifer",
+      "last_name": "Taylor",
+      "email": "jennifer.taylor@example.com",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2023-01-08T00:00:00Z",
+      "role": "PARTICIPANTE"
+    }
+  },
+  {
+    "model": "core.User",
+    "pk": 9,
+    "fields": {
+      "password": "pbkdf2_sha256$260000$HASH$SALT",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "participant6",
+      "first_name": "Thomas",
+      "last_name": "Anderson",
+      "email": "thomas.anderson@example.com",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2023-01-09T00:00:00Z",
+      "role": "PARTICIPANTE"
+    }
+  },
+  {
+    "model": "core.User",
+    "pk": 10,
+    "fields": {
+      "password": "pbkdf2_sha256$260000$HASH$SALT",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "participant7",
+      "first_name": "Lisa",
+      "last_name": "White",
+      "email": "lisa.white@example.com",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2023-01-10T00:00:00Z",
+      "role": "PARTICIPANTE"
+    }
+  }
+]

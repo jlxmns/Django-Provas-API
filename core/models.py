@@ -21,6 +21,7 @@ class User(AbstractUser):
     def is_admin(self):
         return self.role == self.Role.ADMIN
 
+
 class AuditedModel(models.Model):
     date_created = models.DateTimeField("Criado em", auto_now_add=True)
     date_changed = models.DateTimeField("Modificado em", auto_now=True)
@@ -39,7 +40,7 @@ class Prova(AuditedModel):
 
 
 class Questao(AuditedModel):
-    provas = models.ManyToManyField(Prova, related_name="provas")
+    provas = models.ManyToManyField(Prova, related_name="questoes")
     text = models.TextField()
     order = models.PositiveIntegerField(default=0)
 
