@@ -1,7 +1,6 @@
-from typing import List
+from ninja import ModelSchema, Schema
 
-from ninja import Schema, ModelSchema
-from core.models import User, Prova, Questao
+from core.models import Prova, Questao, User
 
 
 class RegisterSchema(Schema):
@@ -23,60 +22,60 @@ class RefreshSchema(Schema):
 class UserOut(ModelSchema):
     class Meta:
         model = User
-        fields = ['id', 'username', 'first_name', 'last_name', 'role']
+        fields = ["id", "username", "first_name", "last_name", "role"]
 
 
 class UserIn(ModelSchema):
     class Meta:
         model = User
-        fields = ['username', 'password', 'first_name', 'last_name', 'role', 'email']
+        fields = ["username", "password", "first_name", "last_name", "role", "email"]
 
 
 class UserPatch(ModelSchema):
     class Meta:
         model = User
-        exclude = ['id', 'last_login', 'is_superuser', 'date_joined']
-        fields_optional = '__all__'
+        exclude = ["id", "last_login", "is_superuser", "date_joined"]
+        fields_optional = "__all__"
 
 
 class ProvasOut(ModelSchema):
     class Meta:
         model = Prova
-        fields = '__all__'
+        fields = "__all__"
 
 
 class ProvasIn(ModelSchema):
     class Meta:
         model = Prova
-        exclude = ['id', 'date_created', 'date_changed', 'active']
+        exclude = ["id", "date_created", "date_changed", "active"]
 
 
 class ProvasPatch(ModelSchema):
     class Meta:
         model = Prova
-        exclude = ['id', 'date_created', 'date_changed']
-        fields_optional = '__all__'
+        exclude = ["id", "date_created", "date_changed"]
+        fields_optional = "__all__"
 
 
 class QuestoesOut(ModelSchema):
     class Meta:
         model = Questao
-        fields = '__all__'
+        fields = "__all__"
 
 
 class QuestoesIn(ModelSchema):
     class Meta:
         model = Questao
-        exclude = ['id', 'date_created', 'date_changed', 'active', 'provas']
+        exclude = ["id", "date_created", "date_changed", "active", "provas"]
 
 
 class QuestoesPatch(ModelSchema):
     class Meta:
         model = Questao
-        exclude = ['id', 'date_created', 'date_changed', 'active', 'provas']
-        fields_optional = '__all__'
+        exclude = ["id", "date_created", "date_changed", "active", "provas"]
+        fields_optional = "__all__"
 
 
 class QuestoesProva(Schema):
     prova_id: int
-    questao_id: List[int]
+    questao_id: list[int]

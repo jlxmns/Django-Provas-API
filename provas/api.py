@@ -1,17 +1,14 @@
-from typing import List
-
 from django.db import transaction
 from django.shortcuts import get_object_or_404
+from ninja import NinjaAPI
 from ninja.errors import HttpError
+from ninja.pagination import paginate
 from ninja.throttling import AnonRateThrottle
 from ninja_jwt.authentication import JWTAuth
 from ninja_jwt.exceptions import TokenError
 from ninja_jwt.tokens import RefreshToken
 
-from core.models import User, Prova, Questao
-from ninja import NinjaAPI
-from ninja.pagination import paginate
-
+from core.models import Prova, Questao, User
 from provas import schemas
 
 api = NinjaAPI()
@@ -24,6 +21,7 @@ class AdminJWTAuth(JWTAuth):
             raise HttpError(403, "Admin access required")
 
         return user
+
 
 ######################################################################
 # Autenticação & Usuários
@@ -43,8 +41,8 @@ def login(request, data: schemas.LoginSchema):
             "access": str(refresh.access_token),
             "refresh": str(refresh),
         }
-    except User.DoesNotExist:
-        raise HttpError(404, "Usuário não registrado ou senha incorreta.")
+    except User.DoesNotExist as err:
+        raise HttpError(404, "Usuário não registrado ou senha incorreta.") from err
 
 
 @api.post("/register")
@@ -64,7 +62,7 @@ def register(request, data: schemas.RegisterSchema):
     return {
         "message": "Usuário criado com sucesso",
         "access": str(refresh.access_token),
-        "refresh": str(refresh)
+        "refresh": str(refresh),
     }
 
 
@@ -77,8 +75,8 @@ def refresh(request, data: schemas.RefreshSchema):
         if not User.objects.filter(id=user_id).exists():
             raise HttpError(401, "Usuário não encontrado ou token inválida.")
         return {"access": new_access_token}
-    except TokenError:
-        raise HttpError(401, "Token inválida ou expirada.")
+    except TokenError as err:
+        raise HttpError(401, "Token inválida ou expirada.") from err
 
 
 @api.get("/me", auth=JWTAuth())
@@ -88,11 +86,11 @@ def get_user_by_token(request):
         "id": user.id,
         "email": user.username,
         "first_name": user.first_name,
-        "last_name": user.last_name
+        "last_name": user.last_name,
     }
 
 
-@api.get("/get_users", response=List[schemas.UserOut], auth=AdminJWTAuth())
+@api.get("/get_users", response=list[schemas.UserOut], auth=AdminJWTAuth())
 @paginate
 def get_users(request):
     return User.objects.all()
@@ -105,7 +103,7 @@ def create_user(request, payload: schemas.UserIn):
 
     user = User.objects.create_user(**payload.dict())
 
-    refresh = RefreshToken.for_user(user)
+    RefreshToken.for_user(user)
 
     return {
         "message": "Usuário criado com sucesso",
@@ -140,7 +138,7 @@ def delete_user(request, user_id: int):
 ######################################################################
 
 
-@api.get("/get_provas", response=List[schemas.ProvasOut])
+@api.get("/get_provas", response=list[schemas.ProvasOut])
 @paginate
 def get_prova(request):
     return Prova.objects.all()
@@ -178,7 +176,7 @@ def delete_prova(request, prova_id: int):
     return {"message": f"Prova ID {prova_id} deletada."}
 
 
-@api.get("provas/{prova_id}/questoes", response=List[schemas.QuestoesOut])
+@api.get("provas/{prova_id}/questoes", response=list[schemas.QuestoesOut])
 @paginate
 def retrieve_questoes_from_prova(request, prova_id: int):
     prova = get_object_or_404(Prova, id=prova_id)
@@ -192,7 +190,9 @@ def add_questao_to_prova(request, payload: schemas.QuestoesProva):
     for questao_id in payload.questao_id:
         questao = get_object_or_404(Questao, id=questao_id)
         prova.questoes.add(questao)
-    return {'message': f"Questão(s) ID {', '.join(str(q_id) for q_id in payload.questao_id)} adicionadas(s) à prova ID {prova.id}"}
+    return {
+        "message": f"Questão(s) ID {', '.join(str(q_id) for q_id in payload.questao_id)} adicionadas(s) à prova ID {prova.id}"
+    }
 
 
 @transaction.atomic
@@ -202,7 +202,9 @@ def remove_questao_from_prova(request, payload: schemas.QuestoesProva):
     for questao_id in payload.questao_id:
         questao = get_object_or_404(Questao, id=questao_id)
         prova.questoes.remove(questao)
-    return {'message': f"Questão(s) ID {', '.join(str(q_id) for q_id in payload.questao_id)} removida(s) da prova ID {prova.id}"}
+    return {
+        "message": f"Questão(s) ID {', '.join(str(q_id) for q_id in payload.questao_id)} removida(s) da prova ID {prova.id}"
+    }
 
 
 ######################################################################
@@ -210,7 +212,7 @@ def remove_questao_from_prova(request, payload: schemas.QuestoesProva):
 ######################################################################
 
 
-@api.get("/get_questoes", response=List[schemas.QuestoesOut])
+@api.get("/get_questoes", response=list[schemas.QuestoesOut])
 @paginate
 def get_questao(request):
     return Questao.objects.all()
