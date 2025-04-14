@@ -1,6 +1,6 @@
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
-from ninja import NinjaAPI
+from ninja import NinjaAPI, Query
 from ninja.errors import HttpError
 from ninja.pagination import paginate
 from ninja.throttling import AnonRateThrottle
@@ -24,11 +24,11 @@ class AdminJWTAuth(JWTAuth):
 
 
 ######################################################################
-# Autenticação & Usuários
+# Autenticação
 ######################################################################
 
 
-@api.post("/login", throttle=AnonRateThrottle(rate="10/h"))
+@api.post("/login", throttle=AnonRateThrottle(rate="10/h"), tags=["auth"])
 def login(request, data: schemas.LoginSchema):
     try:
         user = User.objects.get(username=data.email)
@@ -45,7 +45,7 @@ def login(request, data: schemas.LoginSchema):
         raise HttpError(404, "Usuário não registrado ou senha incorreta.") from err
 
 
-@api.post("/register")
+@api.post("/register", tags=["auth"])
 def register(request, data: schemas.RegisterSchema):
     if User.objects.filter(username=data.email).exists():
         raise HttpError(400, "Usuário já existente.")
@@ -66,7 +66,7 @@ def register(request, data: schemas.RegisterSchema):
     }
 
 
-@api.post("/refresh")
+@api.post("/refresh", tags=["auth"])
 def refresh(request, data: schemas.RefreshSchema):
     try:
         refresh = RefreshToken(data.refresh)
@@ -79,7 +79,7 @@ def refresh(request, data: schemas.RefreshSchema):
         raise HttpError(401, "Token inválida ou expirada.") from err
 
 
-@api.get("/me", auth=JWTAuth())
+@api.get("/me", auth=JWTAuth(), tags=["auth"])
 def get_user_by_token(request):
     user = request.auth
     return {
@@ -90,19 +90,36 @@ def get_user_by_token(request):
     }
 
 
-@api.get("/get_users", response=list[schemas.UserOut], auth=AdminJWTAuth())
+######################################################################
+# Users
+######################################################################
+
+
+@api.get(
+    "/get_users", response=list[schemas.UserOut], auth=AdminJWTAuth(), tags=["users"]
+)
 @paginate
-def get_users(request, name: str = None):
+def get_users(
+    request,
+    name: str = None,
+    order_by: str | None = Query(None, description="Ordenar por campo. Ex: '-nome'"),
+):
+    queryset = User.objects.all()
+
     if name:
-        return User.objects.filter(
+        queryset = queryset.filter(
             Q(name__icontains=name)
             | Q(first_name__iexact=name)
             | Q(last_name__iexact=name)
         )
-    return User.objects.all()
+
+    if order_by:
+        queryset = queryset.order_by(order_by)
+
+    return queryset
 
 
-@api.post("/create_user", auth=AdminJWTAuth())
+@api.post("/create_user", auth=AdminJWTAuth(), tags=["users"])
 def create_user(request, payload: schemas.UserIn):
     if User.objects.filter(username=payload.username).exists():
         raise HttpError(400, "Usuário já existente.")
@@ -117,13 +134,15 @@ def create_user(request, payload: schemas.UserIn):
     }
 
 
-@api.post("/users/{user_id}", auth=AdminJWTAuth(), response=schemas.UserOut)
+@api.post(
+    "/users/{user_id}", auth=AdminJWTAuth(), response=schemas.UserOut, tags=["users"]
+)
 def retrieve_user(request, user_id: int):
     user = get_object_or_404(User, id=user_id)
     return user
 
 
-@api.patch("/update_user/{user_id}")
+@api.patch("/update_user/{user_id}", tags=["users"])
 def update_user(request, user_id: int, payload: schemas.UserPatch):
     user = get_object_or_404(User, id=user_id)
     for attr, value in payload.dict(exclude_unset=True).items():
@@ -132,7 +151,7 @@ def update_user(request, user_id: int, payload: schemas.UserPatch):
     return {"message": f"Usuário ID f{user.id} modificado com sucesso."}
 
 
-@api.delete("delete_user/{user_id}")
+@api.delete("delete_user/{user_id}", tags=["users"])
 def delete_user(request, user_id: int):
     user = get_object_or_404(User, id=user_id)
     user.delete()
@@ -144,15 +163,25 @@ def delete_user(request, user_id: int):
 ######################################################################
 
 
-@api.get("/get_provas", response=list[schemas.ProvasOut])
+@api.get("/get_provas", response=list[schemas.ProvasOut], tags=["provas"])
 @paginate
-def get_prova(request, q: str = None):
+def get_prova(
+    request,
+    q: str = None,
+    order_by: str | None = Query(None, description="Ordenar por campo. Ex: '-nome'"),
+):
+    queryset = Prova.objects.all()
+
     if q:
-        return Prova.objects.filter(Q(title__icontains=q) | Q(description__icontains=q))
-    return Prova.objects.all()
+        queryset = queryset.filter(Q(title__icontains=q) | Q(description__icontains=q))
+
+    if order_by:
+        queryset = queryset.order_by(order_by)
+
+    return queryset
 
 
-@api.post("/create_prova")
+@api.post("/create_prova", tags=["provas"])
 def create_prova(request, payload: schemas.ProvasIn):
     prova = Prova.objects.create(**payload.dict())
 
@@ -162,13 +191,13 @@ def create_prova(request, payload: schemas.ProvasIn):
     }
 
 
-@api.post("/provas/{prova_id}", response=schemas.ProvasOut)
+@api.post("/provas/{prova_id}", response=schemas.ProvasOut, tags=["provas"])
 def retrieve_prova(request, prova_id: int):
     prova = get_object_or_404(Prova, id=prova_id)
     return prova
 
 
-@api.patch("/update_prova/{prova_id}")
+@api.patch("/update_prova/{prova_id}", tags=["provas"])
 def update_prova(request, prova_id: int, payload: schemas.ProvasPatch):
     prova = get_object_or_404(Prova, id=prova_id)
     for attr, value in payload.dict(exclude_unset=True).items():
@@ -177,21 +206,23 @@ def update_prova(request, prova_id: int, payload: schemas.ProvasPatch):
     return {"message": f"Prova ID f{prova.id} modificada com sucesso."}
 
 
-@api.delete("delete_prova/{prova_id}")
+@api.delete("delete_prova/{prova_id}", tags=["provas"])
 def delete_prova(request, prova_id: int):
     prova = get_object_or_404(Prova, id=prova_id)
     prova.delete()
     return {"message": f"Prova ID {prova_id} deletada."}
 
 
-@api.get("provas/{prova_id}/questoes", response=list[schemas.QuestoesOut])
+@api.get(
+    "provas/{prova_id}/questoes", response=list[schemas.QuestoesOut], tags=["provas"]
+)
 @paginate
 def retrieve_questoes_from_prova(request, prova_id: int):
     prova = get_object_or_404(Prova, id=prova_id)
     return prova.questoes.all()
 
 
-@api.post("/provas/{prova_id}/add_questoes")
+@api.post("/provas/{prova_id}/add_questoes", tags=["provas"])
 def add_questao_to_prova(request, prova_id: int, payload: schemas.QuestoesProva):
     prova = get_object_or_404(Prova, id=prova_id)
     for questao_id in payload.questao_id:
@@ -202,7 +233,7 @@ def add_questao_to_prova(request, prova_id: int, payload: schemas.QuestoesProva)
     }
 
 
-@api.delete("/provas/{prova_id}/remover_questoes")
+@api.delete("/provas/{prova_id}/remover_questoes", tags=["provas"])
 def remove_questao_from_prova(request, prova_id: int, payload: schemas.QuestoesProva):
     prova = get_object_or_404(Prova, id=payload.prova_id)
     for questao_id in payload.questao_id:
@@ -218,15 +249,25 @@ def remove_questao_from_prova(request, prova_id: int, payload: schemas.QuestoesP
 ######################################################################
 
 
-@api.get("/get_questoes", response=list[schemas.QuestoesOut])
+@api.get("/get_questoes", response=list[schemas.QuestoesOut], tags=["questoes"])
 @paginate
-def get_questao(request, q: str = None):
+def get_questao(
+    request,
+    q: str = None,
+    order_by: str | None = Query(None, description="Ordenar por campo. Ex: '-nome'"),
+):
+    queryset = Questao.objects.all()
+
     if q:
-        return Questao.objects.filter(text__icontains=q)
-    return Questao.objects.all()
+        queryset = queryset.filter(text__icontains=q)
+
+    if order_by:
+        queryset = queryset.order_by(order_by)
+
+    return queryset
 
 
-@api.post("/create_questao")
+@api.post("/create_questao", tags=["questoes"])
 def create_questao(request, payload: schemas.QuestoesIn):
     questao = Questao.objects.create(**payload.dict())
 
@@ -236,13 +277,13 @@ def create_questao(request, payload: schemas.QuestoesIn):
     }
 
 
-@api.post("/questoes/{questao_id}", response=schemas.QuestoesOut)
+@api.post("/questoes/{questao_id}", response=schemas.QuestoesOut, tags=["questoes"])
 def retrieve_questao(request, questao_id: int):
     questao = get_object_or_404(Questao, id=questao_id)
     return questao
 
 
-@api.patch("/update_questao/{questao_id}")
+@api.patch("/update_questao/{questao_id}", tags=["questoes"])
 def update_questao(request, questao_id: int, payload: schemas.QuestoesPatch):
     questao = get_object_or_404(Questao, id=questao_id)
     for attr, value in payload.dict(exclude_unset=True).items():
@@ -251,7 +292,7 @@ def update_questao(request, questao_id: int, payload: schemas.QuestoesPatch):
     return {"message": f"Questão ID {questao.id} modificada com sucesso."}
 
 
-@api.delete("delete_questao/{questao_id}")
+@api.delete("delete_questao/{questao_id}", tags=["questoes"])
 def delete_questao(request, questao_id: int):
     questao = get_object_or_404(Questao, id=questao_id)
     questao.delete()
@@ -263,15 +304,25 @@ def delete_questao(request, questao_id: int):
 ######################################################################
 
 
-@api.get("/get_respostas", response=list[schemas.RespostasOut])
+@api.get("/get_respostas", response=list[schemas.RespostasOut], tags=["respostas"])
 @paginate
-def get_respostas(request, q: str = None):
+def get_respostas(
+    request,
+    q: str = None,
+    order_by: str | None = Query(None, description="Ordenar por campo. Ex: '-nome'"),
+):
+    queryset = Resposta.objects.all()
+
     if q:
-        return Resposta.objects.filter(text__icontains=q)
-    return Resposta.objects.all()
+        queryset = queryset.filter(text__icontains=q)
+
+    if order_by:
+        queryset = queryset.order_by(order_by)
+
+    return queryset
 
 
-@api.post("/create_resposta")
+@api.post("/create_resposta", tags=["respostas"])
 def create_resposta(request, payload: schemas.RespostasIn):
     resposta = Resposta.objects.create(**payload.dict())
 
@@ -281,13 +332,13 @@ def create_resposta(request, payload: schemas.RespostasIn):
     }
 
 
-@api.post("/respostas/{resposta_id}", response=schemas.RespostasOut)
+@api.post("/respostas/{resposta_id}", response=schemas.RespostasOut, tags=["respostas"])
 def retrieve_resposta(request, resposta_id: int):
     resposta = get_object_or_404(Questao, id=resposta_id)
     return resposta
 
 
-@api.patch("/update_resposta/{resposta_id}")
+@api.patch("/update_resposta/{resposta_id}", tags=["respostas"])
 def update_resposta(request, resposta_id: int, payload: schemas.RespostasPatch):
     resposta = get_object_or_404(Resposta, id=resposta_id)
     for attr, value in payload.dict(exclude_unset=True).items():
@@ -296,7 +347,7 @@ def update_resposta(request, resposta_id: int, payload: schemas.RespostasPatch):
     return {"message": f"Resposta ID {resposta.id} modificada com sucesso."}
 
 
-@api.delete("resposta/{resposta_id}")
+@api.delete("resposta/{resposta_id}", tags=["respostas"])
 def delete_resposta(request, resposta_id: int):
     resposta = get_object_or_404(Resposta, id=resposta_id)
     resposta.delete()
@@ -308,17 +359,31 @@ def delete_resposta(request, resposta_id: int):
 ######################################################################
 
 
-@api.get("/get_respostas_participante", response=list[schemas.RespostaParticipanteOut])
+@api.get(
+    "/get_respostas_participante",
+    response=list[schemas.RespostaParticipanteOut],
+    tags=["respostas_participantes"],
+)
 @paginate
-def get_respostas_participante(request, q: str = None):
+def get_respostas_participante(
+    request,
+    q: str = None,
+    order_by: str | None = Query(None, description="Ordenar por campo. Ex: '-nome'"),
+):
+    queryset = RespostaParticipante.objects.all()
+
     if q:
-        return RespostaParticipante.objects.filter(
+        queryset = queryset.filter(
             Q(questao__text__icontains=q) | Q(resposta_escolhida__text__icontains=q)
         )
-    return RespostaParticipante.objects.all()
+
+    if order_by:
+        queryset = queryset.order_by(order_by)
+
+    return queryset
 
 
-@api.post("/create_resposta_participante")
+@api.post("/create_resposta_participante", tags=["respostas_participantes"])
 def create_resposta_participante(request, payload: schemas.RespostaParticipanteIn):
     resposta_participante = RespostaParticipante.objects.create(**payload.dict())
 
@@ -328,7 +393,10 @@ def create_resposta_participante(request, payload: schemas.RespostaParticipanteI
     }
 
 
-@api.patch("/update_resposta_participante/{resposta_participante_id}")
+@api.patch(
+    "/update_resposta_participante/{resposta_participante_id}",
+    tags=["respostas_participantes"],
+)
 def update_resposta_participante(
     request, resposta_participante_id: int, payload: schemas.RespostaParticipantePatch
 ):
