@@ -1,6 +1,6 @@
 from ninja import ModelSchema, Schema
 
-from core.models import Prova, Questao, User
+from core.models import Prova, Questao, Resposta, RespostaParticipante, User
 
 
 class RegisterSchema(Schema):
@@ -77,5 +77,42 @@ class QuestoesPatch(ModelSchema):
 
 
 class QuestoesProva(Schema):
-    prova_id: int
     questao_id: list[int]
+
+
+class RespostasOut(ModelSchema):
+    class Meta:
+        model = Resposta
+        fields = "__all__"
+
+
+class RespostasIn(ModelSchema):
+    class Meta:
+        model = Resposta
+        fields = ["questao", "text", "is_correct"]
+
+
+class RespostasPatch(ModelSchema):
+    class Meta:
+        model = Resposta
+        fields = ["questao", "text", "is_correct"]
+        fields_optional = "__all__"
+
+
+class RespostaParticipanteIn(ModelSchema):
+    class Meta:
+        model = RespostaParticipante
+        fields = ["tentativa_prova", "questao", "resposta_escolhida"]
+
+
+class RespostaParticipanteOut(ModelSchema):
+    class Meta:
+        model = RespostaParticipante
+        fields = "__all__"
+
+
+class RespostaParticipantePatch(ModelSchema):
+    class Meta:
+        model = RespostaParticipante
+        fields = ["tentativa_prova", "questao", "resposta_escolhida"]
+        optional_fields = "__all__"

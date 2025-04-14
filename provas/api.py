@@ -1,4 +1,4 @@
-from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from ninja import NinjaAPI
 from ninja.errors import HttpError
@@ -8,7 +8,7 @@ from ninja_jwt.authentication import JWTAuth
 from ninja_jwt.exceptions import TokenError
 from ninja_jwt.tokens import RefreshToken
 
-from core.models import Prova, Questao, User
+from core.models import Prova, Questao, Resposta, RespostaParticipante, User
 from provas import schemas
 
 api = NinjaAPI()
@@ -92,7 +92,13 @@ def get_user_by_token(request):
 
 @api.get("/get_users", response=list[schemas.UserOut], auth=AdminJWTAuth())
 @paginate
-def get_users(request):
+def get_users(request, name: str = None):
+    if name:
+        return User.objects.filter(
+            Q(name__icontains=name)
+            | Q(first_name__iexact=name)
+            | Q(last_name__iexact=name)
+        )
     return User.objects.all()
 
 
@@ -140,7 +146,9 @@ def delete_user(request, user_id: int):
 
 @api.get("/get_provas", response=list[schemas.ProvasOut])
 @paginate
-def get_prova(request):
+def get_prova(request, q: str = None):
+    if q:
+        return Prova.objects.filter(Q(title__icontains=q) | Q(description__icontains=q))
     return Prova.objects.all()
 
 
@@ -183,10 +191,9 @@ def retrieve_questoes_from_prova(request, prova_id: int):
     return prova.questoes.all()
 
 
-@transaction.atomic
 @api.post("/provas/{prova_id}/add_questoes")
-def add_questao_to_prova(request, payload: schemas.QuestoesProva):
-    prova = get_object_or_404(Prova, id=payload.prova_id)
+def add_questao_to_prova(request, prova_id: int, payload: schemas.QuestoesProva):
+    prova = get_object_or_404(Prova, id=prova_id)
     for questao_id in payload.questao_id:
         questao = get_object_or_404(Questao, id=questao_id)
         prova.questoes.add(questao)
@@ -195,9 +202,8 @@ def add_questao_to_prova(request, payload: schemas.QuestoesProva):
     }
 
 
-@transaction.atomic
 @api.delete("/provas/{prova_id}/remover_questoes")
-def remove_questao_from_prova(request, payload: schemas.QuestoesProva):
+def remove_questao_from_prova(request, prova_id: int, payload: schemas.QuestoesProva):
     prova = get_object_or_404(Prova, id=payload.prova_id)
     for questao_id in payload.questao_id:
         questao = get_object_or_404(Questao, id=questao_id)
@@ -214,7 +220,9 @@ def remove_questao_from_prova(request, payload: schemas.QuestoesProva):
 
 @api.get("/get_questoes", response=list[schemas.QuestoesOut])
 @paginate
-def get_questao(request):
+def get_questao(request, q: str = None):
+    if q:
+        return Questao.objects.filter(text__icontains=q)
     return Questao.objects.all()
 
 
@@ -248,3 +256,88 @@ def delete_questao(request, questao_id: int):
     questao = get_object_or_404(Questao, id=questao_id)
     questao.delete()
     return {"message": f"Questão ID {questao_id} deletada."}
+
+
+######################################################################
+# Respostas
+######################################################################
+
+
+@api.get("/get_respostas", response=list[schemas.RespostasOut])
+@paginate
+def get_respostas(request, q: str = None):
+    if q:
+        return Resposta.objects.filter(text__icontains=q)
+    return Resposta.objects.all()
+
+
+@api.post("/create_resposta")
+def create_resposta(request, payload: schemas.RespostasIn):
+    resposta = Resposta.objects.create(**payload.dict())
+
+    return {
+        "message": "Resposta criada com sucesso",
+        "id": resposta.id,
+    }
+
+
+@api.post("/respostas/{resposta_id}", response=schemas.RespostasOut)
+def retrieve_resposta(request, resposta_id: int):
+    resposta = get_object_or_404(Questao, id=resposta_id)
+    return resposta
+
+
+@api.patch("/update_resposta/{resposta_id}")
+def update_resposta(request, resposta_id: int, payload: schemas.RespostasPatch):
+    resposta = get_object_or_404(Resposta, id=resposta_id)
+    for attr, value in payload.dict(exclude_unset=True).items():
+        setattr(resposta, attr, value)
+    resposta.save()
+    return {"message": f"Resposta ID {resposta.id} modificada com sucesso."}
+
+
+@api.delete("resposta/{resposta_id}")
+def delete_resposta(request, resposta_id: int):
+    resposta = get_object_or_404(Resposta, id=resposta_id)
+    resposta.delete()
+    return {"message": f"Questão ID {resposta_id} deletada."}
+
+
+######################################################################
+# Respostas de Participantes
+######################################################################
+
+
+@api.get("/get_respostas_participante", response=list[schemas.RespostaParticipanteOut])
+@paginate
+def get_respostas_participante(request, q: str = None):
+    if q:
+        return RespostaParticipante.objects.filter(
+            Q(questao__text__icontains=q) | Q(resposta_escolhida__text__icontains=q)
+        )
+    return RespostaParticipante.objects.all()
+
+
+@api.post("/create_resposta_participante")
+def create_resposta_participante(request, payload: schemas.RespostaParticipanteIn):
+    resposta_participante = RespostaParticipante.objects.create(**payload.dict())
+
+    return {
+        "message": "Resposta de participante criada com sucesso",
+        "id": resposta_participante.id,
+    }
+
+
+@api.patch("/update_resposta_participante/{resposta_participante_id}")
+def update_resposta_participante(
+    request, resposta_participante_id: int, payload: schemas.RespostaParticipantePatch
+):
+    resposta_participante = get_object_or_404(
+        RespostaParticipante, id=resposta_participante_id
+    )
+    for attr, value in payload.dict(exclude_unset=True).items():
+        setattr(resposta_participante, attr, value)
+    resposta_participante.save()
+    return {
+        "message": f"Resposta de Participante ID {resposta_participante.id} modificada com sucesso."
+    }

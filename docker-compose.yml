@@ -1,0 +1,33 @@
+services:
+  redis:
+    image: redis:7.0-alpine
+    ports:
+      - "6379:6379"
+
+  web:
+    container_name: web
+    command: bash -c "poetry run python manage.py runserver 0.0.0.0:8000"
+    env_file:
+      - .env
+    volumes:
+      - .:/code
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+
+  celery:
+    container_name: celery
+    build:
+      context: .
+    command: celery -A provas worker -l INFO
+    env_file:
+      - .env
+    volumes:
+      - .:/code
+    depends_on:
+      - redis
+      - web

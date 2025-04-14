@@ -4,15 +4,13 @@ from django.db import models
 
 class User(AbstractUser):
     class Role(models.TextChoices):
-        ADMIN = 'ADMIN', "Administrador"
-        PARTICIPANTE = 'PARTICIPANTE', 'Participante'
+        ADMIN = "ADMIN", "Administrador"
+        PARTICIPANTE = "PARTICIPANTE", "Participante"
 
     name = models.CharField(max_length=255)
     email = models.EmailField(unique=True)
     role = models.CharField(
-        max_length=255,
-        choices=Role.choices,
-        default=Role.PARTICIPANTE
+        max_length=255, choices=Role.choices, default=Role.PARTICIPANTE
     )
 
     def __str__(self):
@@ -42,6 +40,9 @@ class Prova(AuditedModel):
 class Questao(AuditedModel):
     provas = models.ManyToManyField(Prova, related_name="questoes")
     text = models.TextField()
+    peso = models.DecimalField(
+        verbose_name="Peso da questão", max_digits=3, decimal_places=2
+    )
     order = models.PositiveIntegerField(default=0)
 
     class Meta:
@@ -52,7 +53,9 @@ class Questao(AuditedModel):
 
 
 class Resposta(AuditedModel):
-    questao = models.ForeignKey(Questao, on_delete=models.CASCADE, related_name="respostas")
+    questao = models.ForeignKey(
+        Questao, on_delete=models.CASCADE, related_name="respostas"
+    )
     text = models.CharField(max_length=1000)
     is_correct = models.BooleanField(default=False)
 
@@ -64,10 +67,13 @@ class TentativaProva(AuditedModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     prova = models.ForeignKey(Prova, on_delete=models.CASCADE)
     date_completed = models.DateTimeField(null=True, blank=True)
+    nota = models.PositiveIntegerField(null=True)
 
 
 class RespostaParticipante(AuditedModel):
-    tentativa_prova = models.ForeignKey(TentativaProva, on_delete=models.CASCADE, related_name="tentativas_resposta")
+    tentativa_prova = models.ForeignKey(
+        TentativaProva, on_delete=models.CASCADE, related_name="tentativas_resposta"
+    )
     questao = models.ForeignKey(Questao, on_delete=models.CASCADE)
     resposta_escolhida = models.ForeignKey(Resposta, on_delete=models.CASCADE)
 

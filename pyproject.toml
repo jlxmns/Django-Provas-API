@@ -6,11 +6,15 @@ authors = [
     {name = "jlxmns",email = "jlxmns@pm.me"}
 ]
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.13,<4.0"
 dependencies = [
-    "django (>=5.2,<6.0)",
+    "django (>=5.1)",
     "django-ninja (>=1.4.0,<2.0.0)",
-    "django-ninja-jwt (>=5.3.7,<6.0.0)"
+    "django-ninja-jwt (>=5.3.7,<6.0.0)",
+    "django-celery-beat (>=2.7.0,<3.0.0)",
+    "gunicorn (>=23.0.0,<24.0.0)",
+    "redis (>=5.2.1,<6.0.0)",
+    "celery[redis] (>=5.5.1,<6.0.0)"
 ]
 
 [tool.ruff]
@@ -39,4 +43,3 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^4.2.0"
 ruff = "^0.11.4"
-
