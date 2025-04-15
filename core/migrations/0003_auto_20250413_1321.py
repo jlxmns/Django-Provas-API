@@ -4,8 +4,11 @@ from django.db import migrations
 
 
 def create_daily_task(apps, schema_editor):
-    CrontabSchedule = apps.get_model('django_celery_beat', 'CrontabSchedule')
-    PeriodicTask = apps.get_model('django_celery_beat', 'PeriodicTask')
+    try:
+        CrontabSchedule = apps.get_model("django_celery_beat", "CrontabSchedule")
+        PeriodicTask = apps.get_model("django_celery_beat", "PeriodicTask")
+    except LookupError:
+        return
 
     schedule, _ = CrontabSchedule.objects.get_or_create(
         minute='59',
@@ -29,5 +32,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(create_daily_task)
+        migrations.RunPython(create_daily_task, reverse_code=migrations.RunPython.noop)
     ]

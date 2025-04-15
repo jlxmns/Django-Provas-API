@@ -1,6 +1,14 @@
 from ninja import ModelSchema, Schema
 
-from core.models import Prova, Questao, Resposta, RespostaParticipante, User
+from core.models import (
+    Prova,
+    Questao,
+    RegistroRanking,
+    Resposta,
+    RespostaParticipante,
+    TentativaProva,
+    User,
+)
 
 
 class RegisterSchema(Schema):
@@ -116,3 +124,15 @@ class RespostaParticipantePatch(ModelSchema):
         model = RespostaParticipante
         fields = ["tentativa_prova", "questao", "resposta_escolhida"]
         optional_fields = "__all__"
+
+
+class RankingOut(ModelSchema):
+    class Meta:
+        model = RegistroRanking
+        fields = ["posicao", "user", "nota"]
+
+
+class TentativaProvaOut(ModelSchema):
+    class Meta:
+        model = TentativaProva
+        fields = ["prova", "date_completed", "nota"]

@@ -31,9 +31,9 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django_celery_beat",
     "ninja",
     "ninja_jwt",
-    "django_celery_beat",
     "core",
     "provas",
 ]

@@ -1,6 +1,8 @@
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
+from django.views.decorators.cache import cache_page
 from ninja import NinjaAPI, Query
+from ninja.decorators import decorate_view
 from ninja.errors import HttpError
 from ninja.pagination import paginate
 from ninja.throttling import AnonRateThrottle
@@ -8,7 +10,16 @@ from ninja_jwt.authentication import JWTAuth
 from ninja_jwt.exceptions import TokenError
 from ninja_jwt.tokens import RefreshToken
 
-from core.models import Prova, Questao, Resposta, RespostaParticipante, User
+from core.models import (
+    Prova,
+    Questao,
+    Ranking,
+    RegistroRanking,
+    Resposta,
+    RespostaParticipante,
+    TentativaProva,
+    User,
+)
 from provas import schemas
 
 api = NinjaAPI()
@@ -98,6 +109,7 @@ def get_user_by_token(request):
 @api.get(
     "/get_users", response=list[schemas.UserOut], auth=AdminJWTAuth(), tags=["users"]
 )
+@decorate_view(cache_page(60 * 15))
 @paginate
 def get_users(
     request,
@@ -164,6 +176,7 @@ def delete_user(request, user_id: int):
 
 
 @api.get("/get_provas", response=list[schemas.ProvasOut], tags=["provas"])
+@decorate_view(cache_page(60 * 15))
 @paginate
 def get_prova(
     request,
@@ -216,6 +229,7 @@ def delete_prova(request, prova_id: int):
 @api.get(
     "provas/{prova_id}/questoes", response=list[schemas.QuestoesOut], tags=["provas"]
 )
+@decorate_view(cache_page(60 * 15))
 @paginate
 def retrieve_questoes_from_prova(request, prova_id: int):
     prova = get_object_or_404(Prova, id=prova_id)
@@ -250,6 +264,7 @@ def remove_questao_from_prova(request, prova_id: int, payload: schemas.QuestoesP
 
 
 @api.get("/get_questoes", response=list[schemas.QuestoesOut], tags=["questoes"])
+@decorate_view(cache_page(60 * 15))
 @paginate
 def get_questao(
     request,
@@ -305,6 +320,7 @@ def delete_questao(request, questao_id: int):
 
 
 @api.get("/get_respostas", response=list[schemas.RespostasOut], tags=["respostas"])
+@decorate_view(cache_page(60 * 15))
 @paginate
 def get_respostas(
     request,
@@ -355,6 +371,67 @@ def delete_resposta(request, resposta_id: int):
 
 
 ######################################################################
+# API para Participantes
+######################################################################
+
+
+@api.get(
+    path="/participante/provas",
+    response=list[schemas.TentativaProvaOut],
+    tags=["portal_participante"],
+    auth=JWTAuth(),
+)
+def get_participante_prova(
+    request,
+    q: str = None,
+    order_by: str | None = Query(None, description="Ordenar por campo. Ex: '-nome'"),
+):
+    user = request.user
+    tentativas = TentativaProva.objects.filter(user=user)
+
+    if q:
+        tentativas = tentativas.filter(prova__title__icontains=q)
+
+    if order_by:
+        tentativas = tentativas.order_by(order_by)
+
+    return tentativas
+
+
+@api.post("/participante/create_resposta", tags=["portal_participante"], auth=JWTAuth())
+def create_participante_resposta(request, payload: schemas.RespostaParticipanteIn):
+    resposta_participante = RespostaParticipante.objects.create(**payload.dict())
+
+    return {
+        "message": "Resposta de participante criada com sucesso",
+        "id": resposta_participante.id,
+    }
+
+
+@api.patch(
+    "/participante/update_resposta/{resposta_participante_id}",
+    tags=["portal_participante"],
+    auth=JWTAuth(),
+)
+def update_participante_resposta(
+    request, resposta_participante_id: int, payload: schemas.RespostaParticipantePatch
+):
+    resposta_participante = get_object_or_404(
+        RespostaParticipante, id=resposta_participante_id
+    )
+
+    if resposta_participante.tentativa_prova.user is not request.user:
+        return {"message": "Sem permissão para modificar essa resposta."}
+
+    for attr, value in payload.dict(exclude_unset=True).items():
+        setattr(resposta_participante, attr, value)
+    resposta_participante.save()
+    return {
+        "message": f"Resposta da Questão {resposta_participante.questao} modificada com sucesso."
+    }
+
+
+######################################################################
 # Respostas de Participantes
 ######################################################################
 
@@ -364,6 +441,7 @@ def delete_resposta(request, resposta_id: int):
     response=list[schemas.RespostaParticipanteOut],
     tags=["respostas_participantes"],
 )
+@decorate_view(cache_page(60 * 15))
 @paginate
 def get_respostas_participante(
     request,
@@ -409,3 +487,15 @@ def update_resposta_participante(
     return {
         "message": f"Resposta de Participante ID {resposta_participante.id} modificada com sucesso."
     }
+
+
+######################################################################
+# Ranking
+######################################################################
+
+
+@api.post("/ranking/{prova_id}", response=schemas.RankingOut, tags=["ranking"])
+def retrieve_ranking_from_prova(request, prova_id: int):
+    ranking = get_object_or_404(Ranking, prova_id=prova_id)
+
+    return RegistroRanking.objects.filter(ranking=ranking).order_by("posicao")

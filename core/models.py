@@ -82,3 +82,22 @@ class RespostaParticipante(AuditedModel):
 
     def __str__(self):
         return f"Pergunta: {self.questao} / Resposta: {self.resposta_escolhida}"
+
+
+class Ranking(AuditedModel):
+    prova = models.OneToOneField(Prova, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"Ranking da {self.prova}"
+
+
+class RegistroRanking(AuditedModel):
+    ranking = models.ForeignKey(Ranking, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    tentativa_prova = models.ForeignKey(TentativaProva, on_delete=models.CASCADE)
+    posicao = models.PositiveIntegerField()
+    nota = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ["posicao"]
+        unique_together = ["ranking", "posicao"]
