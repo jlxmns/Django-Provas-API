@@ -119,11 +119,10 @@ class RespostaParticipanteOut(ModelSchema):
         fields = "__all__"
 
 
-class RespostaParticipantePatch(ModelSchema):
-    class Meta:
-        model = RespostaParticipante
-        fields = ["tentativa_prova", "questao", "resposta_escolhida"]
-        optional_fields = "__all__"
+class RespostaParticipantePatch(Schema):
+    tentativa_prova_id: int | None = None
+    questao_id: int | None = None
+    resposta_escolhida_id: int | None = None
 
 
 class RankingOut(ModelSchema):

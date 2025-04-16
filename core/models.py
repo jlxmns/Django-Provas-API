@@ -60,7 +60,7 @@ class Resposta(AuditedModel):
     is_correct = models.BooleanField(default=False)
 
     def __str__(self):
-        return self.questao
+        return self.questao.text
 
 
 class TentativaProva(AuditedModel):

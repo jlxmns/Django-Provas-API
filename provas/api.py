@@ -1,12 +1,14 @@
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.views.decorators.cache import cache_page
-from ninja import NinjaAPI, Query
+from ninja import Query
 from ninja.decorators import decorate_view
 from ninja.errors import HttpError
 from ninja.pagination import paginate
 from ninja.throttling import AnonRateThrottle
+from ninja_extra import NinjaExtraAPI
 from ninja_jwt.authentication import JWTAuth
+from ninja_jwt.controller import NinjaJWTDefaultController
 from ninja_jwt.exceptions import TokenError
 from ninja_jwt.tokens import RefreshToken
 
@@ -22,7 +24,8 @@ from core.models import (
 )
 from provas import schemas
 
-api = NinjaAPI()
+api = NinjaExtraAPI()
+api.register_controllers(NinjaJWTDefaultController)
 
 
 class AdminJWTAuth(JWTAuth):
@@ -175,7 +178,12 @@ def delete_user(request, user_id: int):
 ######################################################################
 
 
-@api.get("/get_provas", response=list[schemas.ProvasOut], tags=["provas"])
+@api.get(
+    "/provas/listagem",
+    response=list[schemas.ProvasOut],
+    tags=["provas"],
+    auth=AdminJWTAuth(),
+)
 @decorate_view(cache_page(60 * 15))
 @paginate
 def get_prova(
@@ -194,7 +202,7 @@ def get_prova(
     return queryset
 
 
-@api.post("/create_prova", tags=["provas"])
+@api.post("/provas/create", tags=["provas"])
 def create_prova(request, payload: schemas.ProvasIn):
     prova = Prova.objects.create(**payload.dict())
 
@@ -210,7 +218,7 @@ def retrieve_prova(request, prova_id: int):
     return prova
 
 
-@api.patch("/update_prova/{prova_id}", tags=["provas"])
+@api.patch("/provas/update/{prova_id}", tags=["provas"])
 def update_prova(request, prova_id: int, payload: schemas.ProvasPatch):
     prova = get_object_or_404(Prova, id=prova_id)
     for attr, value in payload.dict(exclude_unset=True).items():
@@ -219,7 +227,7 @@ def update_prova(request, prova_id: int, payload: schemas.ProvasPatch):
     return {"message": f"Prova ID f{prova.id} modificada com sucesso."}
 
 
-@api.delete("delete_prova/{prova_id}", tags=["provas"])
+@api.delete("/provas/delete/{prova_id}", tags=["provas"])
 def delete_prova(request, prova_id: int):
     prova = get_object_or_404(Prova, id=prova_id)
     prova.delete()
@@ -227,7 +235,7 @@ def delete_prova(request, prova_id: int):
 
 
 @api.get(
-    "provas/{prova_id}/questoes", response=list[schemas.QuestoesOut], tags=["provas"]
+    "/provas/{prova_id}/questoes", response=list[schemas.QuestoesOut], tags=["provas"]
 )
 @decorate_view(cache_page(60 * 15))
 @paginate
@@ -249,7 +257,7 @@ def add_questao_to_prova(request, prova_id: int, payload: schemas.QuestoesProva)
 
 @api.delete("/provas/{prova_id}/remover_questoes", tags=["provas"])
 def remove_questao_from_prova(request, prova_id: int, payload: schemas.QuestoesProva):
-    prova = get_object_or_404(Prova, id=payload.prova_id)
+    prova = get_object_or_404(Prova, id=prova_id)
     for questao_id in payload.questao_id:
         questao = get_object_or_404(Questao, id=questao_id)
         prova.questoes.remove(questao)
@@ -263,7 +271,7 @@ def remove_questao_from_prova(request, prova_id: int, payload: schemas.QuestoesP
 ######################################################################
 
 
-@api.get("/get_questoes", response=list[schemas.QuestoesOut], tags=["questoes"])
+@api.get("/questoes/listagem", response=list[schemas.QuestoesOut], tags=["questoes"])
 @decorate_view(cache_page(60 * 15))
 @paginate
 def get_questao(
@@ -282,7 +290,7 @@ def get_questao(
     return queryset
 
 
-@api.post("/create_questao", tags=["questoes"])
+@api.post("/questoes/create", tags=["questoes"])
 def create_questao(request, payload: schemas.QuestoesIn):
     questao = Questao.objects.create(**payload.dict())
 
@@ -298,7 +306,7 @@ def retrieve_questao(request, questao_id: int):
     return questao
 
 
-@api.patch("/update_questao/{questao_id}", tags=["questoes"])
+@api.patch("/questoes/update/{questao_id}", tags=["questoes"])
 def update_questao(request, questao_id: int, payload: schemas.QuestoesPatch):
     questao = get_object_or_404(Questao, id=questao_id)
     for attr, value in payload.dict(exclude_unset=True).items():
@@ -307,7 +315,7 @@ def update_questao(request, questao_id: int, payload: schemas.QuestoesPatch):
     return {"message": f"Questão ID {questao.id} modificada com sucesso."}
 
 
-@api.delete("delete_questao/{questao_id}", tags=["questoes"])
+@api.delete("/questoes/delete/{questao_id}", tags=["questoes"])
 def delete_questao(request, questao_id: int):
     questao = get_object_or_404(Questao, id=questao_id)
     questao.delete()
@@ -319,7 +327,7 @@ def delete_questao(request, questao_id: int):
 ######################################################################
 
 
-@api.get("/get_respostas", response=list[schemas.RespostasOut], tags=["respostas"])
+@api.get("/respostas/listagem", response=list[schemas.RespostasOut], tags=["respostas"])
 @decorate_view(cache_page(60 * 15))
 @paginate
 def get_respostas(
@@ -338,9 +346,14 @@ def get_respostas(
     return queryset
 
 
-@api.post("/create_resposta", tags=["respostas"])
+@api.post("/respostas/create", tags=["respostas"])
 def create_resposta(request, payload: schemas.RespostasIn):
-    resposta = Resposta.objects.create(**payload.dict())
+    questao = Questao.objects.get(id=payload.questao)
+    resposta = Resposta.objects.create(
+        questao=questao,
+        text=payload.text,
+        is_correct=payload.is_correct,
+    )
 
     return {
         "message": "Resposta criada com sucesso",
@@ -350,11 +363,11 @@ def create_resposta(request, payload: schemas.RespostasIn):
 
 @api.post("/respostas/{resposta_id}", response=schemas.RespostasOut, tags=["respostas"])
 def retrieve_resposta(request, resposta_id: int):
-    resposta = get_object_or_404(Questao, id=resposta_id)
+    resposta = get_object_or_404(Resposta, id=resposta_id)
     return resposta
 
 
-@api.patch("/update_resposta/{resposta_id}", tags=["respostas"])
+@api.patch("/respostas/update/{resposta_id}", tags=["respostas"])
 def update_resposta(request, resposta_id: int, payload: schemas.RespostasPatch):
     resposta = get_object_or_404(Resposta, id=resposta_id)
     for attr, value in payload.dict(exclude_unset=True).items():
@@ -363,7 +376,7 @@ def update_resposta(request, resposta_id: int, payload: schemas.RespostasPatch):
     return {"message": f"Resposta ID {resposta.id} modificada com sucesso."}
 
 
-@api.delete("resposta/{resposta_id}", tags=["respostas"])
+@api.delete("/respostas/delete/{resposta_id}", tags=["respostas"])
 def delete_resposta(request, resposta_id: int):
     resposta = get_object_or_404(Resposta, id=resposta_id)
     resposta.delete()
@@ -381,6 +394,8 @@ def delete_resposta(request, resposta_id: int):
     tags=["portal_participante"],
     auth=JWTAuth(),
 )
+@decorate_view(cache_page(60 * 15))
+@paginate
 def get_participante_prova(
     request,
     q: str = None,
@@ -400,7 +415,14 @@ def get_participante_prova(
 
 @api.post("/participante/create_resposta", tags=["portal_participante"], auth=JWTAuth())
 def create_participante_resposta(request, payload: schemas.RespostaParticipanteIn):
-    resposta_participante = RespostaParticipante.objects.create(**payload.dict())
+    tentativa_prova = TentativaProva.objects.get(id=payload.tentativa_prova)
+    questao = Questao.objects.get(id=payload.questao)
+    resposta_escolhida = Resposta.objects.get(id=payload.resposta_escolhida)
+    resposta_participante = RespostaParticipante.objects.create(
+        tentativa_prova=tentativa_prova,
+        questao=questao,
+        resposta_escolhida=resposta_escolhida,
+    )
 
     return {
         "message": "Resposta de participante criada com sucesso",
@@ -420,11 +442,13 @@ def update_participante_resposta(
         RespostaParticipante, id=resposta_participante_id
     )
 
-    if resposta_participante.tentativa_prova.user is not request.user:
+    if resposta_participante.tentativa_prova.user != request.user:
         return {"message": "Sem permissão para modificar essa resposta."}
 
     for attr, value in payload.dict(exclude_unset=True).items():
-        setattr(resposta_participante, attr, value)
+        print(attr, value)
+        field = attr.replace("_id", "")
+        setattr(resposta_participante, f"{field}_id", value)
     resposta_participante.save()
     return {
         "message": f"Resposta da Questão {resposta_participante.questao} modificada com sucesso."
