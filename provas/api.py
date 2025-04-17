@@ -5,11 +5,9 @@ from ninja import Query
 from ninja.decorators import decorate_view
 from ninja.errors import HttpError
 from ninja.pagination import paginate
-from ninja.throttling import AnonRateThrottle
 from ninja_extra import NinjaExtraAPI
 from ninja_jwt.authentication import JWTAuth
 from ninja_jwt.controller import NinjaJWTDefaultController
-from ninja_jwt.exceptions import TokenError
 from ninja_jwt.tokens import RefreshToken
 
 from core.models import (
@@ -42,7 +40,7 @@ class AdminJWTAuth(JWTAuth):
 ######################################################################
 
 
-@api.post("/login", throttle=AnonRateThrottle(rate="10/h"), tags=["auth"])
+@api.post("/login", tags=["auth"])
 def login(request, data: schemas.LoginSchema):
     try:
         user = User.objects.get(username=data.email)
@@ -80,37 +78,16 @@ def register(request, data: schemas.RegisterSchema):
     }
 
 
-@api.post("/refresh", tags=["auth"])
-def refresh(request, data: schemas.RefreshSchema):
-    try:
-        refresh = RefreshToken(data.refresh)
-        new_access_token = str(refresh.access_token)
-        user_id = refresh.payload.get("user_id")
-        if not User.objects.filter(id=user_id).exists():
-            raise HttpError(401, "Usuário não encontrado ou token inválida.")
-        return {"access": new_access_token}
-    except TokenError as err:
-        raise HttpError(401, "Token inválida ou expirada.") from err
-
-
-@api.get("/me", auth=JWTAuth(), tags=["auth"])
-def get_user_by_token(request):
-    user = request.auth
-    return {
-        "id": user.id,
-        "email": user.username,
-        "first_name": user.first_name,
-        "last_name": user.last_name,
-    }
-
-
 ######################################################################
 # Users
 ######################################################################
 
 
 @api.get(
-    "/get_users", response=list[schemas.UserOut], auth=AdminJWTAuth(), tags=["users"]
+    "users/listagem",
+    response=list[schemas.UserOut],
+    auth=AdminJWTAuth(),
+    tags=["users"],
 )
 @decorate_view(cache_page(60 * 15))
 @paginate
@@ -134,7 +111,7 @@ def get_users(
     return queryset
 
 
-@api.post("/create_user", auth=AdminJWTAuth(), tags=["users"])
+@api.post("users/create_user", auth=AdminJWTAuth(), tags=["users"])
 def create_user(request, payload: schemas.UserIn):
     if User.objects.filter(username=payload.username).exists():
         raise HttpError(400, "Usuário já existente.")
@@ -157,20 +134,20 @@ def retrieve_user(request, user_id: int):
     return user
 
 
-@api.patch("/update_user/{user_id}", tags=["users"])
+@api.patch("/users/update/{user_id}", tags=["users"], auth=AdminJWTAuth())
 def update_user(request, user_id: int, payload: schemas.UserPatch):
     user = get_object_or_404(User, id=user_id)
     for attr, value in payload.dict(exclude_unset=True).items():
         setattr(user, attr, value)
     user.save()
-    return {"message": f"Usuário ID f{user.id} modificado com sucesso."}
+    return {"message": "Usuário modificado com sucesso.", "id": f"{user.id}"}
 
 
-@api.delete("delete_user/{user_id}", tags=["users"])
+@api.delete("/users/delete/{user_id}", tags=["users"], auth=AdminJWTAuth())
 def delete_user(request, user_id: int):
     user = get_object_or_404(User, id=user_id)
     user.delete()
-    return {"message": f"Usuário ID {user_id} deletado."}
+    return {"message": "Usuário deletado.", "id": f"{user_id}"}
 
 
 ######################################################################
@@ -202,7 +179,7 @@ def get_prova(
     return queryset
 
 
-@api.post("/provas/create", tags=["provas"])
+@api.post("/provas/create", tags=["provas"], auth=AdminJWTAuth())
 def create_prova(request, payload: schemas.ProvasIn):
     prova = Prova.objects.create(**payload.dict())
 
@@ -212,13 +189,18 @@ def create_prova(request, payload: schemas.ProvasIn):
     }
 
 
-@api.post("/provas/{prova_id}", response=schemas.ProvasOut, tags=["provas"])
+@api.post(
+    "/provas/{prova_id}",
+    response=schemas.ProvasOut,
+    tags=["provas"],
+    auth=AdminJWTAuth(),
+)
 def retrieve_prova(request, prova_id: int):
     prova = get_object_or_404(Prova, id=prova_id)
     return prova
 
 
-@api.patch("/provas/update/{prova_id}", tags=["provas"])
+@api.patch("/provas/update/{prova_id}", tags=["provas"], auth=AdminJWTAuth())
 def update_prova(request, prova_id: int, payload: schemas.ProvasPatch):
     prova = get_object_or_404(Prova, id=prova_id)
     for attr, value in payload.dict(exclude_unset=True).items():
@@ -227,7 +209,7 @@ def update_prova(request, prova_id: int, payload: schemas.ProvasPatch):
     return {"message": f"Prova ID f{prova.id} modificada com sucesso."}
 
 
-@api.delete("/provas/delete/{prova_id}", tags=["provas"])
+@api.delete("/provas/delete/{prova_id}", tags=["provas"], auth=AdminJWTAuth())
 def delete_prova(request, prova_id: int):
     prova = get_object_or_404(Prova, id=prova_id)
     prova.delete()
@@ -235,7 +217,10 @@ def delete_prova(request, prova_id: int):
 
 
 @api.get(
-    "/provas/{prova_id}/questoes", response=list[schemas.QuestoesOut], tags=["provas"]
+    "/provas/{prova_id}/questoes",
+    response=list[schemas.QuestoesOut],
+    tags=["provas"],
+    auth=AdminJWTAuth(),
 )
 @decorate_view(cache_page(60 * 15))
 @paginate
@@ -244,7 +229,7 @@ def retrieve_questoes_from_prova(request, prova_id: int):
     return prova.questoes.all()
 
 
-@api.post("/provas/{prova_id}/add_questoes", tags=["provas"])
+@api.post("/provas/{prova_id}/add_questoes", tags=["provas"], auth=AdminJWTAuth())
 def add_questao_to_prova(request, prova_id: int, payload: schemas.QuestoesProva):
     prova = get_object_or_404(Prova, id=prova_id)
     for questao_id in payload.questao_id:
@@ -255,7 +240,7 @@ def add_questao_to_prova(request, prova_id: int, payload: schemas.QuestoesProva)
     }
 
 
-@api.delete("/provas/{prova_id}/remover_questoes", tags=["provas"])
+@api.delete("/provas/{prova_id}/remover_questoes", tags=["provas"], auth=AdminJWTAuth())
 def remove_questao_from_prova(request, prova_id: int, payload: schemas.QuestoesProva):
     prova = get_object_or_404(Prova, id=prova_id)
     for questao_id in payload.questao_id:
@@ -271,7 +256,12 @@ def remove_questao_from_prova(request, prova_id: int, payload: schemas.QuestoesP
 ######################################################################
 
 
-@api.get("/questoes/listagem", response=list[schemas.QuestoesOut], tags=["questoes"])
+@api.get(
+    "/questoes/listagem",
+    response=list[schemas.QuestoesOut],
+    tags=["questoes"],
+    auth=AdminJWTAuth(),
+)
 @decorate_view(cache_page(60 * 15))
 @paginate
 def get_questao(
@@ -290,7 +280,7 @@ def get_questao(
     return queryset
 
 
-@api.post("/questoes/create", tags=["questoes"])
+@api.post("/questoes/create", tags=["questoes"], auth=AdminJWTAuth())
 def create_questao(request, payload: schemas.QuestoesIn):
     questao = Questao.objects.create(**payload.dict())
 
@@ -300,13 +290,18 @@ def create_questao(request, payload: schemas.QuestoesIn):
     }
 
 
-@api.post("/questoes/{questao_id}", response=schemas.QuestoesOut, tags=["questoes"])
+@api.post(
+    "/questoes/{questao_id}",
+    response=schemas.QuestoesOut,
+    tags=["questoes"],
+    auth=AdminJWTAuth(),
+)
 def retrieve_questao(request, questao_id: int):
     questao = get_object_or_404(Questao, id=questao_id)
     return questao
 
 
-@api.patch("/questoes/update/{questao_id}", tags=["questoes"])
+@api.patch("/questoes/update/{questao_id}", tags=["questoes"], auth=AdminJWTAuth())
 def update_questao(request, questao_id: int, payload: schemas.QuestoesPatch):
     questao = get_object_or_404(Questao, id=questao_id)
     for attr, value in payload.dict(exclude_unset=True).items():
@@ -315,7 +310,7 @@ def update_questao(request, questao_id: int, payload: schemas.QuestoesPatch):
     return {"message": f"Questão ID {questao.id} modificada com sucesso."}
 
 
-@api.delete("/questoes/delete/{questao_id}", tags=["questoes"])
+@api.delete("/questoes/delete/{questao_id}", tags=["questoes"], auth=AdminJWTAuth())
 def delete_questao(request, questao_id: int):
     questao = get_object_or_404(Questao, id=questao_id)
     questao.delete()
@@ -327,7 +322,12 @@ def delete_questao(request, questao_id: int):
 ######################################################################
 
 
-@api.get("/respostas/listagem", response=list[schemas.RespostasOut], tags=["respostas"])
+@api.get(
+    "/respostas/listagem",
+    response=list[schemas.RespostasOut],
+    tags=["respostas"],
+    auth=AdminJWTAuth(),
+)
 @decorate_view(cache_page(60 * 15))
 @paginate
 def get_respostas(
@@ -346,7 +346,7 @@ def get_respostas(
     return queryset
 
 
-@api.post("/respostas/create", tags=["respostas"])
+@api.post("/respostas/create", tags=["respostas"], auth=AdminJWTAuth())
 def create_resposta(request, payload: schemas.RespostasIn):
     questao = Questao.objects.get(id=payload.questao)
     resposta = Resposta.objects.create(
@@ -361,13 +361,18 @@ def create_resposta(request, payload: schemas.RespostasIn):
     }
 
 
-@api.post("/respostas/{resposta_id}", response=schemas.RespostasOut, tags=["respostas"])
+@api.post(
+    "/respostas/{resposta_id}",
+    response=schemas.RespostasOut,
+    tags=["respostas"],
+    auth=AdminJWTAuth(),
+)
 def retrieve_resposta(request, resposta_id: int):
     resposta = get_object_or_404(Resposta, id=resposta_id)
     return resposta
 
 
-@api.patch("/respostas/update/{resposta_id}", tags=["respostas"])
+@api.patch("/respostas/update/{resposta_id}", tags=["respostas"], auth=AdminJWTAuth())
 def update_resposta(request, resposta_id: int, payload: schemas.RespostasPatch):
     resposta = get_object_or_404(Resposta, id=resposta_id)
     for attr, value in payload.dict(exclude_unset=True).items():
@@ -376,7 +381,7 @@ def update_resposta(request, resposta_id: int, payload: schemas.RespostasPatch):
     return {"message": f"Resposta ID {resposta.id} modificada com sucesso."}
 
 
-@api.delete("/respostas/delete/{resposta_id}", tags=["respostas"])
+@api.delete("/respostas/delete/{resposta_id}", tags=["respostas"], auth=AdminJWTAuth())
 def delete_resposta(request, resposta_id: int):
     resposta = get_object_or_404(Resposta, id=resposta_id)
     resposta.delete()
@@ -461,9 +466,10 @@ def update_participante_resposta(
 
 
 @api.get(
-    "/get_respostas_participante",
+    "/resposta_participante/listagem",
     response=list[schemas.RespostaParticipanteOut],
     tags=["respostas_participantes"],
+    auth=AdminJWTAuth(),
 )
 @decorate_view(cache_page(60 * 15))
 @paginate
@@ -485,9 +491,20 @@ def get_respostas_participante(
     return queryset
 
 
-@api.post("/create_resposta_participante", tags=["respostas_participantes"])
+@api.post(
+    "/resposta_participante/create_resposta",
+    tags=["respostas_participantes"],
+    auth=AdminJWTAuth(),
+)
 def create_resposta_participante(request, payload: schemas.RespostaParticipanteIn):
-    resposta_participante = RespostaParticipante.objects.create(**payload.dict())
+    tentativa_prova = TentativaProva.objects.get(id=payload.tentativa_prova)
+    questao = Questao.objects.get(id=payload.questao)
+    resposta_escolhida = Resposta.objects.get(id=payload.resposta_escolhida)
+    resposta_participante = RespostaParticipante.objects.create(
+        tentativa_prova=tentativa_prova,
+        questao=questao,
+        resposta_escolhida=resposta_escolhida,
+    )
 
     return {
         "message": "Resposta de participante criada com sucesso",
@@ -496,8 +513,9 @@ def create_resposta_participante(request, payload: schemas.RespostaParticipanteI
 
 
 @api.patch(
-    "/update_resposta_participante/{resposta_participante_id}",
+    "/resposta_participante/update_resposta/{resposta_participante_id}",
     tags=["respostas_participantes"],
+    auth=AdminJWTAuth(),
 )
 def update_resposta_participante(
     request, resposta_participante_id: int, payload: schemas.RespostaParticipantePatch
@@ -518,7 +536,12 @@ def update_resposta_participante(
 ######################################################################
 
 
-@api.post("/ranking/{prova_id}", response=schemas.RankingOut, tags=["ranking"])
+@api.post(
+    "/ranking/prova/{prova_id}",
+    response=schemas.RankingOut,
+    tags=["ranking"],
+    auth=JWTAuth(),
+)
 def retrieve_ranking_from_prova(request, prova_id: int):
     ranking = get_object_or_404(Ranking, prova_id=prova_id)
 

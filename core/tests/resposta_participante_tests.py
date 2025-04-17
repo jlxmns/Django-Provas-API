@@ -1,43 +1,78 @@
-from django.utils import timezone
-
 from core import models
 from core.tests.tests import BaseTestCase
 
 
-class ParticipanteListagemProvasTestCase(BaseTestCase):
+class RespostaParticipanteListagemTestCase(BaseTestCase):
     def setUp(self):
         super().setUp()
 
-        self.prova1 = models.Prova.objects.create(
+        self.prova = models.Prova.objects.create(
             title="Prova de Matemática", description="Prova sobre conjuntos"
         )
-        self.prova2 = models.Prova.objects.create(
-            title="Prova de Biologia", description="Prova sobre evolução"
+
+        self.questao = models.Questao.objects.create(text="Questão 01", peso=3, order=2)
+
+        self.questao2 = models.Questao.objects.create(
+            text="Questão 01", peso=3, order=2
         )
-        self.tentativa_prova1 = models.TentativaProva.objects.create(
+
+        self.prova.questoes.set([self.questao, self.questao2])
+
+        self.resposta1 = models.Resposta.objects.create(
+            questao=self.questao, text="Resposta 01", is_correct=True
+        )
+        self.resposta2 = models.Resposta.objects.create(
+            questao=self.questao, text="Resposta 02", is_correct=False
+        )
+        self.resposta3 = models.Resposta.objects.create(
+            questao=self.questao, text="Resposta 03", is_correct=False
+        )
+
+        self.resposta3 = models.Resposta.objects.create(
+            questao=self.questao, text="Resposta 03", is_correct=True
+        )
+        self.resposta4 = models.Resposta.objects.create(
+            questao=self.questao, text="Resposta 04", is_correct=False
+        )
+        self.resposta5 = models.Resposta.objects.create(
+            questao=self.questao, text="Resposta 05", is_correct=False
+        )
+
+        self.tentativa_prova = models.TentativaProva.objects.create(
             user=self.regular_user,
-            prova=self.prova1,
+            prova=self.prova,
         )
+
         self.tentativa_prova2 = models.TentativaProva.objects.create(
             user=self.regular_user,
-            prova=self.prova2,
-            date_completed=timezone.now(),
-            nota=10,
+            prova=self.prova,
+        )
+
+        self.resposta_participante = models.RespostaParticipante.objects.create(
+            tentativa_prova=self.tentativa_prova,
+            questao=self.questao,
+            resposta_escolhida=self.resposta1,
+        )
+
+        self.resposta_participante2 = models.RespostaParticipante.objects.create(
+            tentativa_prova=self.tentativa_prova,
+            questao=self.questao2,
+            resposta_escolhida=self.resposta5,
         )
 
     def test_correct_items_and_quantity(self):
         response = self.client.get(
-            "/participante/provas", headers=self.get_regular_headers()
+            "/resposta_participante/listagem", headers=self.get_admin_headers()
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json().get("count"), 2)
-        provas_id = {p["prova"] for p in response.json().get("items")}
-        self.assertIn(1, provas_id)
-        self.assertIn(2, provas_id)
+        questao_id = {p["questao"] for p in response.json().get("items")}
+        self.assertIn(self.resposta_participante.id, questao_id)
+        self.assertIn(self.resposta_participante2.id, questao_id)
 
 
-class ParticipanteCreateTentativaRespostaTestCase(BaseTestCase):
+class RespostaParticipanteCreateTestCase(BaseTestCase):
     def setUp(self):
         super().setUp()
 
@@ -72,7 +107,7 @@ class ParticipanteCreateTentativaRespostaTestCase(BaseTestCase):
         }
 
         response = self.client.post(
-            "/participante/create_resposta",
+            "/resposta_participante/create_resposta",
             json=payload,
             headers=self.get_admin_headers(),
         )
@@ -93,7 +128,7 @@ class ParticipanteCreateTentativaRespostaTestCase(BaseTestCase):
         )
 
 
-class ParticipantePatchTentativaRespostaTestCase(BaseTestCase):
+class RespostaParticipantePatchTestCase(BaseTestCase):
     def setUp(self):
         super().setUp()
 
@@ -126,13 +161,13 @@ class ParticipantePatchTentativaRespostaTestCase(BaseTestCase):
             resposta_escolhida=self.resposta1,
         )
 
-    def test_retrieve_tentativa_resposta_success(self):
+    def test_update_tentativa_resposta_success(self):
         payload = {"resposta_escolhida_id": self.resposta3.id}
 
         response = self.client.patch(
-            f"/participante/update_resposta/{self.resposta_participante.id}",
+            f"/resposta_participante/update_resposta/{self.resposta_participante.id}",
             json=payload,
-            headers=self.get_regular_headers(),
+            headers=self.get_admin_headers(),
         )
 
         self.assertEqual(response.status_code, 200)
